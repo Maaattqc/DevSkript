@@ -1,2 +1,2 @@
 # DevSkript
-Ancien Scripts maintenant publié
+Ce sont d'anciens scripts maintenant publiés
