@@ -1,0 +1,420 @@
+#Author: MaatSK
+#Date: 2020
+
+options:
+    Logo: &6[&3CTF&6]
+    Version: 1.0
+
+import: # importer le code java nécessaire
+    org.bukkit.Particle
+    org.bukkit.Bukkit
+
+function equipTeam(p: player):
+    clear inventory of {_p}
+    heal {_p}
+    set food level of {_p} to 20
+    set {_helmet} to unbreakable leather helmet
+    set {_chestplate} to unbreakable leather chestplate
+    set {_leggings} to unbreakable leather leggings
+    set {_boots} to unbreakable leather boots
+    dye {_helmet} ({ctf::team::%{_p}%} parsed as a color)
+    dye {_chestplate} ({ctf::team::%{_p}%} parsed as a color)
+    dye {_leggings} ({ctf::team::%{_p}%} parsed as a color)
+    dye {_boots} ({ctf::team::%{_p}%} parsed as a color)
+    set {_p}'s helmet to {_helmet}
+    set {_p}'s chestplate to {_chestplate}
+    set {_p}'s leggings to {_leggings}
+    set {_p}'s boots to {_boots}
+    give unbreakable stone sword to {_p}'s inventory
+    give unbreakable bow to {_p}'s inventory
+    give 64 steaks to {_p}'s inventory
+    set slot 8 of {_p}'s inventory to 12 arrows
+
+function resetGame():
+    {ctf::status} is set
+    clear inventory of all players
+    heal all players
+    wait 5 seconds
+    set gamemode of all players to spectator
+    teleport all players to {ctf::lobby}
+    loop all players:
+        #set nametag of loop-player to "&7%loop-player%"
+        set tablist name of loop-player to "&7%loop-player%"
+        set display name of loop-player to "&7%loop-player%"
+        delete {ctf::team::%loop-player%}
+        scoreboard(loop-player, "attente")
+    delete {ctf::status}
+    clear {ctf::red::*}
+    clear {ctf::blue::*}
+    delete {ctf::point::blue}
+    delete {ctf::point::red}
+
+function stopGame():
+    wait a tick
+    send "" to all players
+    send "{@Logo} La partie a été supprimé par manque de joueurs!" to all players
+    send "" to all players
+    resetGame()
+
+function resetFlag(color: text):
+    wait 4 seconds
+    set {_loc} to location of block at {ctf::flag::%{_color}%}
+    set block at {_loc} to "%{_color}% standing banner" parsed as item
+    {_loc}.getWorld().spawnParticle(Particle.CLOUD, {_loc}, 15, 0.5, 0.5 and 0.5)
+
+function scoreboard(p: player, t: text):
+    Bukkit.getServer().getPluginManager().getPlugin("TitleManager").removeScoreboard({_p})
+    Bukkit.getServer().getPluginManager().getPlugin("TitleManager").giveScoreboard({_p})
+    Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardTitle({_p} and "&6Capture The Flag")
+    {_t} = "attente":
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 1 and "&2")
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 2 and "&cEn attente de joueurs..")
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 5 and "&1")
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 4 and "&fJoueurs: &6%number of all players%")
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 3 and "&0")
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 6 and "&emc.ctf.net")
+    else if {_t} = "game":
+        add 0 to {ctf::point::red}
+        add 0 to {ctf::point::blue}
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 1 and "&2")
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 2 and "&cÉquipe Rouge:")
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 3 and " &f%{ctf::point::red}% points ")
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 4 and "&1")
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 5 and "&bÉquipe Bleue:")
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 6 and " &f%{ctf::point::blue}% points")
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 7 and "&0")
+        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue({_p}, 8 and "&emc.ctf.net")    
+
+command /ctf [<text>] [<text>]:
+    trigger:
+        arg-1 is not set:
+            stop
+        else if arg 1 is "setlobby":
+            player is op
+            set {ctf::lobby} to player's location
+            message "&aLe lobby a bien été défini"
+        else if arg 1 is "setflag":
+            player is op
+            if arg 2 is "red" or "blue":
+                set {ctf::flag::%arg-2%} to player's location
+                message "&aLe drapeau %arg-2% &aa bien été défini"
+            else:
+                message "&cVous devez choisir <red/blue>"
+        else if arg 1 is "setspawn":
+            player is op
+            if arg 2 is "red" or "blue":
+                set {ctf::spawn::%arg-2%} to player's location
+                message "&aLe spawn de l'équipe %arg-2% &aa bien été défini"
+            else:
+                message "&cVous devez choisir <red/blue>"
+        else if arg 1 is "reset":
+            player is op
+            send "{@Logo} La partie redémarre!" to all players
+            resetGame()
+        else if arg 1 is "Start":
+            player is op
+            {ctf::status} is not set:
+                size of all players >= 2:
+                    if {ctf::lobby} is not set:
+                        message "&cVous devez avant utiliser /ctf setlobby"
+                        stop
+                    if {ctf::spawn::red} is not set:
+                        message "&cVous devez avant utiliser /ctf setspawn red"
+                        stop
+                    if {ctf::spawn::blue} is not set:
+                        message "&cVous devez avant utiliser /ctf setspawn blue"
+                        stop
+                    if {ctf::flag::red} is not set:
+                        message "&cVous devez avant utiliser /ctf setflag red"
+                        stop
+                    if {ctf::flag::blue} is not set:
+                        message "&cVous devez avant utiliser /ctf setflag blue"
+                        stop
+                    set {ctf::status} to true
+                    loop all integers between 5 and 1:
+                        send "{@Logo} &6La partie débute dans &c%loop-number%&6 seconde(s)!" to all players
+                        play sound "BLOCK_NOTE_BLOCK_BASS" at volume 0.5 to all players
+                        wait a second
+                    size of all players >= 2:
+                        set all players's gamemode to survival
+                        loop all players:
+                            scoreboard(loop-player, "game")
+                            if size of {ctf::red::*} > size of {ctf::blue::*}:
+                                set {ctf::team::%loop-player%} to "blue"
+                                add loop-player to {ctf::blue::*}
+                                set tablist name of loop-player to "&b%loop-player%"
+                                #set nametag of loop-player to "&b"
+                                teleport loop-player to {ctf::spawn::blue}
+                                set displayname of loop-player to "&b%loop-player%"
+                                equipTeam(loop-player)
+                                
+                            else:
+                                set {ctf::team::%loop-player%} to "red"
+                                add loop-player to {ctf::red::*}
+                                set tablist name of loop-player to "&c%loop-player%"
+                                #set nametag of loop-player to "&c"
+                                teleport loop-player to {ctf::spawn::red}
+                                set displayname of loop-player to "&c%loop-player%"
+                                equipTeam(loop-player)
+
+                        resetFlag("blue")
+                        resetFlag("red")
+                        play sound "ENTITY_PLAYER_LEVELUP" at volume 0.5 to all players
+                        play sound "MUSIC_DISC_PIGSTEP" at volume 0.5 for all players
+                        # volume 10 = tout la map
+                        # volume 5 = moitié
+                        # volume
+
+                        # pigstep = gros beat
+                        # wait = petit beat chill très bon
+                        # stal = jaz
+                        # strad = tranquille
+                        # ward = tranquille cool
+                        # mall = chill
+                        # far = chill
+                        send "{@Logo} &eQue la meilleure équipe gagne!" to all players
+                        wait a second
+                        send title "&7Objectif: &c3 points" with subtitle "&6Placer le Drapeau à votre base &c3 &6fois!" to all players 
+                        wait a second
+                        send "" to all players
+                        send "{@Logo} Placer le Drapeau adverse sur votre bloc de &Bdiamant&6!" to all players
+                        send "" to all players
+
+
+                    else:
+                        send "{@Logo} Il faut plus de joueurs pour commencer la partie!" to all players
+                        delete {ctf::status}
+                else:
+                    message "&cIl doit y avoir minimum 2 joueurs"
+            else:
+                message "&cLa partie a déjà commencé"
+
+on respawn:
+    if {ctf::status} is set:
+        teleport player to {ctf::spawn::%{ctf::team::%player%}%}
+        equipTeam(player)
+
+on death of player:
+    cancel drops
+    if attacker is a player:
+        set death message to "%displayname of attacker% &7a tué %displayname of victim%"
+    else:
+        set death message to "&7La gravitée a tué %displayname of victim%"
+    give a golden apple to the attacker
+    if victim's helmet is red standing banner:
+        send "{@Logo} Le drapeau &cRouge &6a été remis à sa place!" to all players
+        resetFlag("red")
+    if victim's helmet is blue standing banner:
+        send "{@Logo} Le drapeau &bBleu &6a été remis à sa place!" to all players
+        resetFlag("blue")
+    wait a tick
+    force the victim to respawn
+    
+on join:
+    set displayname of player to "&7%player%"
+    clear player's inventory
+    heal the player
+    set food level of player to 20
+    {ctf::status} is set:
+        set gamemode of player to spectator
+        teleport player to {ctf::lobby}
+        set join message to "{@Logo} %displayname of player% &fa rejoint en mode spectateur!"
+    else:
+        set join message to "{@Logo} %displayname of player% &fa rejoint la partie! &6%number of all players%/12"
+        set gamemode of player to spectator
+        teleport player to {ctf::lobby}
+        wait a tick
+        scoreboard(player, "attente")
+        loop all players:
+            Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue(loop-player, 4 and "&fJoueurs: &6%number of all players%")
+
+on quit:
+    {ctf::status} is set:
+        set quit message to "{@Logo} %displayname of player% &fa quitté la partie!"
+        remove player from {ctf::%{ctf::team::%player%}%::*}
+        delete {ctf::team::%player%}
+        if size of {ctf::red::*} < 1:
+            stopGame()
+            stop
+        if size of {ctf::blue::*} < 1:
+            stopGame()
+            stop
+        if player's helmet is red standing banner:
+            resetFlag("red")
+            send "{@Logo} Le drapeau &cRouge &6a été remis à sa place!" to all players
+        else if player's helmet is blue standing banner:
+            resetFlag("blue")
+            send "{@Logo} Le drapeau &bBleu &6a été remis à sa place!" to all players
+        
+    else:
+        set quit message to "{@Logo} %displayname of player% &fa quitté!"
+        wait a tick
+        loop all players:
+            Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue(loop-player, 4 and "&fJoueurs: &6%number of all players%")
+
+
+        #quand il quitte avec le drapeau ou -2
+        
+on break:
+    if event-block is a red standing banner:
+        if {ctf::team::%player%} is not "red":
+            clear drops
+            send "{@Logo} &b%player% &6a volé le drapeau &cRouge&6!" to all players
+            set player's helmet to red standing banner
+            set slot (integers from 0 to 35) of player to red standing banner
+            loop all players:
+                if {uhc::team::%loop-player%} = "blue":
+                    play sound "ENTITY_ENDER_DRAGON_HURT" at volume 0.5 to loop-player
+                    loop-player.sendTitle("&cAttention", "&6Votre drapeau a été volé!", 10, 20 and 20)
+            while player is online:
+                wait 15 ticks
+                if player's helmet is red standing banner:
+                    #player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 15, 0.5, 0.5, 0.5)
+                    player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation().add(0, 3 and 0), 25, 0.5, 3, 0.5, 0 and null) 
+                else:
+                    stop
+        else:
+            cancel event
+    else if event-block is a blue standing banner:
+        if {ctf::team::%player%} is not "blue":
+            clear drops
+            send "{@Logo} &c%player% &6a volé le drapeau &bBleu&6!" to all players
+            set player's helmet to blue standing banner
+            set slot (integers from 0 to 35) of player to blue standing banner
+            loop all players:
+                if {uhc::team::%loop-player%} = "red":
+                    play sound "ENTITY_ENDER_DRAGON_HURT" at volume 0.5 to loop-player
+                    loop-player.sendTitle("&cAttention", "&6Votre drapeau a été volé!", 10, 20 and 20)
+            while player is online:
+                wait 15 ticks
+                if player's helmet is blue standing banner:
+                    #player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 15, 0.5, 0.5, 0.5)
+                    player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation().add(0, 3 and 0), 25, 0.5, 3, 0.5, 0 and null) 
+                else:
+                    stop
+        else:
+            cancel event
+    else:
+        cancel event
+
+on place:
+    if event-block is a standing banner:
+        if block under event-block is diamond block:
+            if block 2 under is blue wool:
+                if {ctf::team::%player%} = "blue":
+                    add 1 to {ctf::point::%{ctf::team::%player%}%}
+                    send "" to all players
+                    send "{@Logo} %displayname of player% &6a marqué un point!" to all players
+                    send "" to all players
+                    resetFlag("red")
+                    resetFlag("blue")
+                    loop all players:
+                        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue(loop-player, 6 and " &f%{ctf::point::blue}% points")
+                        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue(loop-player, 3 and " &f%{ctf::point::red}% points ")
+                        equipTeam(loop-player)
+                        teleport loop-player to {ctf::spawn::%{ctf::team::%loop-player%}%}
+                else:
+                    cancel event
+                if {ctf::point::blue} = 3:
+                    resetGame()
+                    clear {ctf::point::blue}
+                    clear {ctf::point::red}
+                    send "&6&ktesttttttttttttttttttttttttttttttttt" to all players
+                    send "{@Logo} Bravo à l'équipe &bBleue!" to all players
+                    send "&6&ktesttttttttttttttttttttttttttttttttt" to all players
+                    loop 3 times:
+                        wait 10 ticks
+                        chance of 50%:
+                            play sound "ENTITY_FIREWORK_ROCKET_TWINKLE" at volume 2 to all players
+                        else:
+                            play sound "ENTITY_FIREWORK_ROCKET_LARGE_BLAST" at volume 2 to all players
+                else if {ctf::point::red} = 3:
+                    resetGame()
+                    clear {ctf::point::blue}
+                    clear {ctf::point::red}
+                    send "&6&ktesttttttttttttttttttttttttttttttttt" to all players
+                    send "{@Logo} Bravo à l'équipe &cRouge!" to all players
+                    send "&6&ktesttttttttttttttttttttttttttttttttt" to all players
+                    loop 3 times:
+                        wait 10 ticks
+                        chance of 50%:
+                            play sound "ENTITY_FIREWORK_ROCKET_TWINKLE" at volume 2 to all players
+                        else:
+                            play sound "ENTITY_FIREWORK_ROCKET_LARGE_BLAST" at volume 2 to all players
+                wait a second
+                set event-block to air
+            else if block 2 under is red wool:
+                if {ctf::team::%player%} = "red":
+                    add 1 to {ctf::point::%{ctf::team::%player%}%}
+                    send "" to all players
+                    send "{@Logo} %displayname of player% &6a marqué un point!" to all players
+                    send "" to all players
+                    resetFlag("blue")
+                    resetFlag("red")
+                    loop all players:
+                        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue(loop-player, 6 and " &f%{ctf::point::blue}% points")
+                        Bukkit.getServer().getPluginManager().getPlugin("TitleManager").setScoreboardValue(loop-player, 3 and " &f%{ctf::point::red}% points ")
+                        equipTeam(loop-player)
+                        teleport loop-player to {ctf::spawn::%{ctf::team::%loop-player%}%}
+                else:
+                    cancel event
+                if {ctf::point::blue} = 3:
+                    resetGame()
+                    clear {ctf::point::blue}
+                    clear {ctf::point::red}
+                    send "&6&ktesttttttttttttttttttttttttttttttttt" to all players
+                    send "{@Logo} Bravo à l'équipe &bBleue!" to all players
+                    send "&6&ktesttttttttttttttttttttttttttttttttt" to all players
+                    loop 3 times:
+                        wait 10 ticks
+                        chance of 50%:
+                            play sound "ENTITY_FIREWORK_ROCKET_TWINKLE" at volume 2 to all players
+                        else:
+                            play sound "ENTITY_FIREWORK_ROCKET_LARGE_BLAST" at volume 2 to all players
+                else if {ctf::point::red} = 3:
+                    resetGame()
+                    clear {ctf::point::blue}
+                    clear {ctf::point::red}
+                    send "&6&ktesttttttttttttttttttttttttttttttttt" to all players
+                    send "{@Logo} Bravo à l'équipe &cRouge!" to all players
+                    send "&6&ktesttttttttttttttttttttttttttttttttt" to all players
+                    loop 3 times:
+                        wait 10 ticks
+                        chance of 50%:
+                            play sound "ENTITY_FIREWORK_ROCKET_TWINKLE" at volume 2 to all players
+                        else:
+                            play sound "ENTITY_FIREWORK_ROCKET_LARGE_BLAST" at volume 2 to all players
+                wait a second
+                set event-block to air
+            else:
+                message "{@Logo} Vous devez apporter le drapeau à votre base puis le poser!"
+                cancel event
+        else:
+            cancel event
+    else:
+        cancel event
+        
+on inventory click:
+    if event-slot is a standing banner:
+        {ctf::team::%player%} is set
+        cancel event
+
+on drop:
+    if event-item is a standing banner:
+        cancel event
+
+on projectile hit:
+    if projectile is a arrow:
+        delete projectile
+
+on mine standing banner:
+    apply haste 2 without any particles to player for 1 second
+
+on chat:
+    set chat format to "%displayname of player% &8» &f%message%"
+
+at 18:00:
+	set time to 7:00
+
+on weather change:
+	clear weather
